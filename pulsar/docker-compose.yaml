@@ -1,0 +1,92 @@
+version: '3.8'
+networks:
+  pulsar:
+    driver: bridge
+
+services:
+  # Start Zookeeper
+  zookeeper:
+    image: apachepulsar/pulsar:3.3.1
+    container_name: zookeeper
+    restart: on-failure
+    networks:
+      - pulsar
+    volumes:
+      - ./data/zookeeper:/pulsar/data/zookeeper
+    environment:
+      - PULSAR_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
+    command: >
+      bash -c "bin/apply-config-from-env.py conf/zookeeper.conf && \
+               bin/generate-zookeeper-config.sh conf/zookeeper.conf && \
+               exec bin/pulsar zookeeper"
+    healthcheck:
+      test: ["CMD", "bin/pulsar-zookeeper-ruok.sh"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # Init cluster metadata
+  pulsar-init:
+    image: apachepulsar/pulsar:3.3.1
+    container_name: pulsar-init
+    hostname: pulsar-init
+    networks:
+      - pulsar
+    command: >
+      bin/pulsar initialize-cluster-metadata \
+             --cluster cluster-a \
+             --zookeeper zookeeper:2181 \
+             --configuration-store zookeeper:2181 \
+             --web-service-url http://broker:8080 \
+             --broker-service-url pulsar://broker:6650
+    depends_on:
+      - zookeeper
+
+  # Start Bookie
+  bookie:
+    image: apachepulsar/pulsar:3.3.1
+    container_name: bookie
+    restart: on-failure
+    networks:
+      - pulsar
+    environment:
+      - clusterName=cluster-a
+      - zkServers=zookeeper:2181
+      - metadataServiceUri=metadata-store:zk:zookeeper:2181
+      - advertisedAddress=bookie
+      - BOOKIE_MEM=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=256m
+    depends_on:
+      - zookeeper
+      - pulsar-init
+    volumes:
+      - ./data/bookkeeper:/pulsar/data/bookkeeper
+    command: bash -c "bin/apply-config-from-env.py conf/bookkeeper.conf && exec bin/pulsar bookie"
+
+  # Start Broker with OAuth2 and Keycloak integration
+  broker:
+    image: apachepulsar/pulsar:3.3.1
+    container_name: broker
+    hostname: broker
+    restart: on-failure
+    networks:
+      - pulsar
+    environment:
+      - metadataStoreUrl=zk:zookeeper:2181
+      - zookeeperServers=zookeeper:2181
+      - clusterName=cluster-a
+      - managedLedgerDefaultEnsembleSize=1
+      - managedLedgerDefaultWriteQuorum=1
+      - managedLedgerDefaultAckQuorum=1
+      - advertisedAddress=broker
+      - advertisedListeners=external:pulsar://172.16.102.12:6650
+      - PULSAR_MEM=-Xms1g -Xmx1g -XX:MaxDirectMemorySize=512m
+    depends_on:
+      - zookeeper
+      - bookie
+    ports:
+      - "6650:6650"
+      - "8080:8080"
+    volumes:
+      - ./custom-auth-broker.conf:/pulsar/conf/broker.conf
+      - ./liderahenkpulsar.auth-1.0.jar:/pulsar/lib/liderahenkpulsar.auth-1.0.jar
+    command: bash -c "bin/pulsar broker"
