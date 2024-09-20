@@ -13,7 +13,7 @@ public class AuthenticationBasicAuth implements Authentication, EncodedAuthentic
 
     private static final Logger log = LoggerFactory.getLogger(AuthenticationBasicAuth.class);
     private static final String AUTH_NAME = "customAuth";  // Ensure this matches your Pulsar broker's expectation
-    private String userId;
+    private String username;
     private String password;
 
     // Default constructor for reflection or configuration usage
@@ -26,7 +26,7 @@ public class AuthenticationBasicAuth implements Authentication, EncodedAuthentic
         if (userId == null || userId.isEmpty() || password == null || password.isEmpty()) {
             throw new IllegalArgumentException("User ID and password must not be null or empty");
         }
-        this.userId = userId;
+        this.username = userId;
         this.password = password;
         log.info("AuthenticationBasicAuth instantiated with userId: {} and password: [PROTECTED]", userId);
     }
@@ -44,7 +44,7 @@ public class AuthenticationBasicAuth implements Authentication, EncodedAuthentic
     @Override
     public AuthenticationDataProvider getAuthData()  {
 
-        return new CustomDataBasic(userId, password);
+        return new CustomDataBasic(username, password);
 
     }
 
@@ -60,6 +60,6 @@ public class AuthenticationBasicAuth implements Authentication, EncodedAuthentic
 
     @Override
     public void start()  {
-        log.info("Starting AuthenticationBasicAuth for userId: {}", userId);
+        log.info("Starting AuthenticationBasicAuth for userId: {}", username);
     }
 }

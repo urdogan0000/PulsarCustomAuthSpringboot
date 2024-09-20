@@ -12,8 +12,8 @@ public class CustomDataBasic implements AuthenticationDataProvider {
     private final   String commandAuthToken;
     private Map<String, String> headers = new HashMap<>();
 
-    public CustomDataBasic(String userId, String password) {
-        this.commandAuthToken = "Basic " + userId+":"+password;
+    public CustomDataBasic(String username, String password) {
+        this.commandAuthToken = "Basic " + username+":"+password;
 
         // Initialize headers
         headers.put(PULSAR_AUTH_METHOD_NAME, "customAuth");
