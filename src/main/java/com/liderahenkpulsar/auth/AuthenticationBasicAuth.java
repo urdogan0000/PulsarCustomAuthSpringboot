@@ -43,9 +43,7 @@ public class AuthenticationBasicAuth implements Authentication, EncodedAuthentic
 
     @Override
     public AuthenticationDataProvider getAuthData()  {
-
         return new CustomDataBasic(username, password);
-
     }
 
     @Override
