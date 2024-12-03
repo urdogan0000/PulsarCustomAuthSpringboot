@@ -4,9 +4,38 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.liderhenkpulsar</groupId>
+    <groupId>io.github.urdogan0000</groupId>
     <artifactId>liderahenkpulsar.auth</artifactId>
-    <version>1.0</version>
+    <version>1.0.5</version>
+
+    <name>io.github.urdogan0000 com.liderahenkpulsar</name>
+    <description>Custom auth for java</description>
+    <url>https://github.com/urdogan0000/PulsarCustomAuthSpringboot</url>
+
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+
+
+    <developers>
+        <developer>
+            <id>urdogan0000</id>
+            <name>Haydar Urdoğan</name>
+            <email>hydrurdgn@gmail.com</email>
+        </developer>
+    </developers>
+
+    <scm>
+        <url>https://github.com/urdogan0000/PulsarCustomAuthSpringboot</url>
+        <connection>scm:git:git://github.com/urdogan0000/PulsarCustomAuthSpringboot.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com:urdogan0000/PulsarCustomAuthSpringboot.git</developerConnection>
+
+    </scm>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -15,13 +44,10 @@
     </properties>
 
     <dependencies>
-
-
-
         <dependency>
             <groupId>org.apache.pulsar</groupId>
             <artifactId>pulsar-broker-common</artifactId>
-            <version>3.2.4</version>
+            <version>4.0.1</version>
         </dependency>
 
         <dependency>
@@ -32,4 +58,66 @@
 
     </dependencies>
 
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.6.0</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <publishingServerId>central</publishingServerId>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-gpg-plugin</artifactId>
+                <version>1.5</version>
+                <executions>
+                    <execution>
+                        <id>sign-artifacts</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>sign</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>3.4.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>3.2.1</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+        </plugins>
+
+    </build>
+
 </project>
+
+
+
+
+
