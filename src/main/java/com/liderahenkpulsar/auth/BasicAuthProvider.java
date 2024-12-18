@@ -12,23 +12,45 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.naming.AuthenticationException;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.TrustManagerFactory;
+import javax.net.ssl.X509TrustManager;
 
 public class BasicAuthProvider implements AuthenticationProvider {
     static final String HTTP_HEADER_NAME = "Authorization";
     static final String AUTH_METHOD_NAME = "customAuth";
     static final String HTTP_HEADER_VALUE_PREFIX = "Basic";
-    static final String REST_API_URL_NAME="authRestApiEndpoint";
+    static final String REST_API_URL_NAME = "authRestApiEndpoint";
     private static final Logger log = LoggerFactory.getLogger(BasicAuthProvider.class);
     private String apiEndpoint;
     private OkHttpClient httpClient;
 
     @Override
     public void initialize(ServiceConfiguration config) throws PulsarServerException {
-        httpClient = new OkHttpClient();
+        this.apiEndpoint = (String) config.getProperties().getOrDefault(REST_API_URL_NAME, "https://localhost:8081/pulsar/send");
+        boolean useSSL = Boolean.parseBoolean((String) config.getProperties().getOrDefault("customAuthUseSSL", "false"));
+        String certPath = (String) config.getProperties().getOrDefault("tlsTrustCertsFilePath", "path/to/server-cert.crt");
 
-        // Initialize the REST client and read configuration
-        this.apiEndpoint = (String) config.getProperties().getOrDefault(REST_API_URL_NAME, "http://localhost:8081/pulsar/send");
+        try {
+            if (useSSL) {
+                log.info("Initializing BasicAuthProvider with TLS enabled.");
+                this.httpClient = createSSLClient(certPath);
+            } else {
+                log.info("Initializing BasicAuthProvider without TLS.");
+                this.httpClient = new OkHttpClient();
+            }
+        } catch (Exception e) {
+            log.error("Error initializing SSL context: ", e);
+            throw new PulsarServerException("Failed to initialize SSL context", e);
+        }
 
         log.info("BasicAuthProvider initialized with endpoint: {}", apiEndpoint);
     }
@@ -42,14 +64,12 @@ public class BasicAuthProvider implements AuthenticationProvider {
     public String authenticate(AuthenticationDataSource authData) throws AuthenticationException {
         String credentials = getUserCredentials(authData);
 
-        // Log the incoming request and Authorization header
         log.info("Authentication request to endpoint: {}", apiEndpoint);
         log.info("Authorization header: {}", credentials);
 
-        // Create a GET request with Basic Authentication header using OkHttp
         Request request = new Request.Builder()
                 .url(apiEndpoint)
-                .addHeader(HTTP_HEADER_NAME, credentials)  // The credentials already contain "Basic <encoded>"
+                .addHeader(HTTP_HEADER_NAME, credentials) // The credentials already contain "Basic <encoded>"
                 .build();
 
         try (Response response = httpClient.newCall(request).execute()) {
@@ -57,14 +77,10 @@ public class BasicAuthProvider implements AuthenticationProvider {
                 assert response.body() != null;
                 String responseBody = response.body().string();
                 log.info("Authentication successful: {}", responseBody);
-                // You can further parse the response if needed to determine success
-                return responseBody;  // Return the result as per your application's requirements
+                return responseBody;
             } else {
-                if (log.isWarnEnabled()) {
-                    log.warn("Authentication failed. HTTP status code: {}, Response: {}",
-                            response.code(),
-                            response.body().string());
-                }
+                log.warn("Authentication failed. HTTP status code: {}, Response: {}",
+                        response.code(), response.body() != null ? response.body().string() : "null");
                 throw new AuthenticationException("Authentication failed. Invalid username or password.");
             }
         } catch (IOException e) {
@@ -74,9 +90,6 @@ public class BasicAuthProvider implements AuthenticationProvider {
     }
 
     public static String getUserCredentials(AuthenticationDataSource authData) throws AuthenticationException {
-        log.info(String.valueOf(authData.hasDataFromCommand()));
-        log.info(authData.getCommandData());
-        log.info(authData.getHttpHeader(HTTP_HEADER_NAME));
         if (authData.hasDataFromCommand()) {
             String commandData = authData.getCommandData();
             log.info("Extracted command data: {}", commandData);
@@ -94,20 +107,49 @@ public class BasicAuthProvider implements AuthenticationProvider {
     }
 
     private static String validateUserCredentials(final String userCredentials) throws AuthenticationException {
-        if (StringUtils.isNotBlank(userCredentials) ) {
+        if (StringUtils.isNotBlank(userCredentials)) {
             return userCredentials;
         } else {
-            log.error("Extracted HTTP header value: {}",HTTP_HEADER_VALUE_PREFIX);
-            log.error(userCredentials);
             throw new AuthenticationException("Invalid or blank user credentials found");
         }
     }
 
     @Override
     public void close() {
-        // Cleanup resources if needed
         if (httpClient != null) {
-            httpClient.connectionPool().evictAll();  // Close all connections in the pool
+            httpClient.connectionPool().evictAll(); // Close all connections in the pool
         }
+    }
+
+    private OkHttpClient createSSLClient(String certPath) throws Exception {
+        // Load the server's certificate from the provided path
+        CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+        X509Certificate certificate;
+        try (InputStream certInputStream = new FileInputStream(certPath)) {
+            certificate = (X509Certificate) certificateFactory.generateCertificate(certInputStream);
+        }
+
+        // Create a TrustManager that trusts this certificate
+        TrustManagerFactory trustManagerFactory = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+        KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+        keyStore.load(null); // Initialize an empty KeyStore
+        keyStore.setCertificateEntry("server", certificate);
+        trustManagerFactory.init(keyStore);
+
+        TrustManager[] trustManagers = trustManagerFactory.getTrustManagers();
+        if (trustManagers.length == 0 || !(trustManagers[0] instanceof X509TrustManager)) {
+            throw new IllegalStateException("No X509TrustManager found");
+        }
+        X509TrustManager trustManager = (X509TrustManager) trustManagers[0];
+
+        // Create an SSLContext that uses the custom TrustManager
+        SSLContext sslContext = SSLContext.getInstance("TLS");
+        sslContext.init(null, new TrustManager[]{trustManager}, new SecureRandom());
+
+        // Build and return the OkHttpClient
+        return new OkHttpClient.Builder()
+                .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
+                .hostnameVerifier((hostname, session) -> true) // Adjust for stricter hostname verification if needed
+                .build();
     }
 }

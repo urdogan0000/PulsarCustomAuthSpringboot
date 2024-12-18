@@ -6,7 +6,7 @@
 
     <groupId>io.github.urdogan0000</groupId>
     <artifactId>liderahenkpulsar.auth</artifactId>
-    <version>1.0.5</version>
+    <version>1.0.6</version>
 
     <name>io.github.urdogan0000 com.liderahenkpulsar</name>
     <description>Custom auth for java</description>
