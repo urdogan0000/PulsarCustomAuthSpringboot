@@ -15,8 +15,8 @@ import javax.naming.AuthenticationException;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.security.KeyStore;
-import java.security.SecureRandom;
+import java.security.*;
+import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import javax.net.ssl.SSLContext;
@@ -48,7 +48,6 @@ public class BasicAuthProvider implements AuthenticationProvider {
                 this.httpClient = new OkHttpClient();
             }
         } catch (Exception e) {
-            log.error("Error initializing SSL context: ", e);
             throw new PulsarServerException("Failed to initialize SSL context", e);
         }
 
@@ -121,7 +120,7 @@ public class BasicAuthProvider implements AuthenticationProvider {
         }
     }
 
-    private OkHttpClient createSSLClient(String certPath) throws Exception {
+    private OkHttpClient createSSLClient(String certPath) throws CertificateException, IOException, KeyStoreException, NoSuchAlgorithmException, KeyManagementException {
         // Load the server's certificate from the provided path
         CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
         X509Certificate certificate;
@@ -149,7 +148,7 @@ public class BasicAuthProvider implements AuthenticationProvider {
         // Build and return the OkHttpClient
         return new OkHttpClient.Builder()
                 .sslSocketFactory(sslContext.getSocketFactory(), trustManager)
-                .hostnameVerifier((hostname, session) -> true) // Adjust for stricter hostname verification if needed
+                .hostnameVerifier((hostname, session) -> false) // Adjust for stricter hostname verification if needed
                 .build();
     }
 }
